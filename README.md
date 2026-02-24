@@ -1,4 +1,4 @@
-# CopilotKit Demo App
+# CopilotKit Banking App
 
 https://github.com/user-attachments/assets/90320a71-3e7a-4159-a3fa-4b844eb3c11d
 
