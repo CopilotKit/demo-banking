@@ -145,6 +145,16 @@ export default function Page() {
     });
   };
 
+  const confirmPendingCard = async () => {
+    if (!pendingCard) return;
+    await addNewCard({
+      ...pendingCard,
+      color: pendingCard.color ?? CARD_COLORS[pendingCard.type],
+      pin: pendingCard.pin ?? randomDigits(4).toString(),
+    });
+    setPendingCard(null);
+  };
+
   // Enable add new card with co pilot (human-in-the-loop)
   useHumanInTheLoop({
     followUp: false,
@@ -215,10 +225,11 @@ export default function Page() {
   }, [hitlEnabled]);
 
   // Add new card — HITL mode (requires approval in chat)
-  useFrontendTool({
+  useHumanInTheLoop({
+    followUp: false,
     name: "addNewCardWithApproval",
-    description: "Add new credit card (requires user approval)",
-    disabled: !hitlEnabled || !PERMISSIONS.ADD_CARD.includes(currentUser.role),
+    description: "Add new credit card (requires user approval). Do NOT ask for confirmation - just call this action immediately. The approval UI will handle user confirmation.",
+    available: (!hitlEnabled || !PERMISSIONS.ADD_CARD.includes(currentUser.role)) ? "disabled" : "enabled",
     parameters: [
       {
         name: "type",
@@ -240,7 +251,7 @@ export default function Page() {
         required: true,
       },
     ],
-    renderAndWait: ({ args, handler, status }) => {
+    render: ({ args, respond, status }) => {
       const { type, color, pin } = args;
 
       if (status === "inProgress") {
@@ -254,27 +265,17 @@ export default function Page() {
             <p><span className="font-medium">Type:</span> {type}</p>
             <p><span className="font-medium">PIN:</span> {pin}</p>
           </div>
-          <div className="flex gap-2 pt-2">
-            <button
-              className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded text-sm transition-colors"
-              onClick={async () => {
-                await addNewCard({ type, color, pin } as NewCardRequest);
-                handler?.("Card created successfully");
-              }}
-            >
-              Approve
-            </button>
-            <button
-              className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded text-sm transition-colors"
-              onClick={() => handler?.("Card creation denied by user")}
-            >
-              Deny
-            </button>
-          </div>
+          <ApprovalButtons
+            onApprove={async () => {
+              await addNewCard({ type, color, pin } as NewCardRequest);
+              respond?.("Card created successfully");
+            }}
+            onDeny={() => respond?.("Card creation denied by user")}
+          />
         </div>
       );
     },
-  }, [hitlEnabled]);
+  });
 
   useHumanInTheLoop({
     followUp: false,
