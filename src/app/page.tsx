@@ -315,7 +315,7 @@ export default function Page() {
           <ApprovalButtons
             onApprove={async () => {
               const policyId = policy?.id;
-              if (!policyId) {
+              if (!cardId || !policyId) {
                 respond?.("Could not find matching policy to assign");
                 return;
               }
@@ -366,6 +366,10 @@ export default function Page() {
           </div>
           <ApprovalButtons
             onApprove={async () => {
+              if (!transactionId || !content) {
+                respond?.("Missing transaction or note content");
+                return;
+              }
               await addNoteToTransaction({ transactionId, content });
               respond?.("Note added successfully");
             }}
@@ -475,6 +479,10 @@ export default function Page() {
           </div>
           <ApprovalButtons
             onApprove={async () => {
+              if (!pin || !cardId) {
+                respond?.("Missing PIN or card information");
+                return;
+              }
               await changePin({ pin, cardId });
               respond?.("PIN changed successfully");
             }}
