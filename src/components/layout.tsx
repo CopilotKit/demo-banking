@@ -110,6 +110,7 @@ export function LayoutComponent({ children }: LayoutProps) {
       On the dashboard page: suggest one summary action, one transaction action, and one navigation action.
       Keep suggestions short and actionable.
     `,
+    available: "always",
     minSuggestions: 3,
     maxSuggestions: 3,
   });

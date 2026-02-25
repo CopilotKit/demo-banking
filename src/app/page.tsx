@@ -1,7 +1,11 @@
 "use client";
 
-import { useEffect, useReducer } from "react";
-import { useCopilotAction, useCopilotReadable } from "@copilotkit/react-core";
+import { useEffect, useReducer, useState } from "react";
+import {
+  useCopilotReadable,
+  useHumanInTheLoop,
+  useFrontendTool,
+} from "@copilotkit/react-core";
 import {
   CARD_COLORS,
   CardBrand,
@@ -23,8 +27,48 @@ import { TransactionsList } from "@/components/transactions-list";
 import { ChangePinDialog } from "@/components/change-pin-dialog";
 import { useSearchParams } from "next/navigation";
 import { CardsPageOperations } from "@/components/copilot-context";
-import { useCopilotChatSuggestions } from "@copilotkit/react-ui";
 import { PERMISSIONS } from "@/app/api/v1/permissions";
+
+function ApprovalButtons({
+  onApprove,
+  onDeny,
+  approveLabel = "Approve",
+  denyLabel = "Deny",
+}: {
+  onApprove: () => Promise<void> | void;
+  onDeny: () => void;
+  approveLabel?: string;
+  denyLabel?: string;
+}) {
+  const [responded, setResponded] = useState(false);
+
+  if (responded) {
+    return <p className="text-sm text-gray-500 italic">Response submitted.</p>;
+  }
+
+  return (
+    <div className="flex gap-2">
+      <button
+        className="flex-1 rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700"
+        onClick={async () => {
+          setResponded(true);
+          await onApprove();
+        }}
+      >
+        {approveLabel}
+      </button>
+      <button
+        className="flex-1 rounded-md bg-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-300"
+        onClick={() => {
+          setResponded(true);
+          onDeny();
+        }}
+      >
+        {denyLabel}
+      </button>
+    </div>
+  );
+}
 
 interface ChangePinState {
   newPin: string;
@@ -95,10 +139,11 @@ export default function Page() {
   };
 
   // Enable add new card with co pilot (human-in-the-loop)
-  useCopilotAction({
+  useHumanInTheLoop({
+    followUp: false,
     name: "addNewCard",
-    description: "Add new credit card. Always show the card details for user approval before creating.",
-    disabled: !PERMISSIONS.ADD_CARD.includes(currentUser.role),
+    description: "Add new credit card. You MUST ask the user for the PIN (4 digits) before calling this action. Once you have all required info, call this action immediately without asking for additional confirmation - the approval UI will handle that.",
+    available: PERMISSIONS.ADD_CARD.includes(currentUser.role) ? "enabled" : "disabled",
     parameters: [
       {
         name: "type",
@@ -120,7 +165,7 @@ export default function Page() {
         required: true,
       },
     ],
-    renderAndWait: ({ args, handler, status }) => {
+    render: ({ args, respond, status }) => {
       const { type, color, pin } = args;
 
       if (status === "inProgress") {
@@ -150,32 +195,23 @@ export default function Page() {
               <p className="text-sm text-gray-500">PIN: {pin}</p>
             </div>
           </div>
-          <div className="flex gap-2">
-            <button
-              className="flex-1 rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700"
-              onClick={async () => {
-                await addNewCard({ type, color, pin } as NewCardRequest);
-                handler?.("Card created successfully");
-              }}
-            >
-              Approve
-            </button>
-            <button
-              className="flex-1 rounded-md bg-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-300"
-              onClick={() => handler?.("Card creation denied by user")}
-            >
-              Deny
-            </button>
-          </div>
+          <ApprovalButtons
+            onApprove={async () => {
+              await addNewCard({ type, color, pin } as NewCardRequest);
+              respond?.("Card created successfully");
+            }}
+            onDeny={() => respond?.("Card creation denied by user")}
+          />
         </div>
       );
     },
   });
 
-  useCopilotAction({
+  useHumanInTheLoop({
+    followUp: false,
     name: "assignPolicyToCard",
-    description: "Assign a policy to a card",
-    disabled: !PERMISSIONS.ADD_POLICY.includes(currentUser.role),
+    description: "Assign a policy to a card. Do NOT ask for confirmation - just call this action immediately. The approval UI will handle user confirmation.",
+    available: PERMISSIONS.ADD_POLICY.includes(currentUser.role) ? "enabled" : "disabled",
     parameters: [
       {
         name: "cardId",
@@ -190,7 +226,7 @@ export default function Page() {
         required: true,
       },
     ],
-    renderAndWait: ({ args, handler, status }) => {
+    render: ({ args, respond, status }) => {
       const { cardId, policyType } = args;
 
       if (status === "inProgress") {
@@ -207,37 +243,28 @@ export default function Page() {
             <p><span className="text-gray-500">Card:</span> {card ? `${card.type} ending in ${card.last4}` : cardId}</p>
             <p><span className="text-gray-500">Policy:</span> {policyType}</p>
           </div>
-          <div className="flex gap-2">
-            <button
-              className="flex-1 rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700"
-              onClick={async () => {
-                const policyId = policy?.id;
-                if (!policyId) {
-                  handler?.("Could not find matching policy to assign");
-                  return;
-                }
-                await assignPolicyToCard({ cardId, policyId });
-                handler?.("Policy assigned successfully");
-              }}
-            >
-              Approve
-            </button>
-            <button
-              className="flex-1 rounded-md bg-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-300"
-              onClick={() => handler?.("Policy assignment denied by user")}
-            >
-              Deny
-            </button>
-          </div>
+          <ApprovalButtons
+            onApprove={async () => {
+              const policyId = policy?.id;
+              if (!policyId) {
+                respond?.("Could not find matching policy to assign");
+                return;
+              }
+              await assignPolicyToCard({ cardId, policyId });
+              respond?.("Policy assigned successfully");
+            }}
+            onDeny={() => respond?.("Policy assignment denied by user")}
+          />
         </div>
       );
     },
   });
 
-  useCopilotAction({
+  useHumanInTheLoop({
+    followUp: false,
     name: "addNoteToTransaction",
-    description: "Add note to transaction",
-    disabled: !PERMISSIONS.ADD_NOTE.includes(currentUser.role),
+    description: "Add note to transaction. Do NOT ask for confirmation - just call this action immediately. The approval UI will handle user confirmation.",
+    available: PERMISSIONS.ADD_NOTE.includes(currentUser.role) ? "enabled" : "disabled",
     parameters: [
       {
         name: "transactionId",
@@ -252,7 +279,7 @@ export default function Page() {
         required: true,
       },
     ],
-    renderAndWait: ({ args, handler, status }) => {
+    render: ({ args, respond, status }) => {
       const { transactionId, content } = args;
 
       if (status === "inProgress") {
@@ -268,35 +295,24 @@ export default function Page() {
             <p><span className="text-gray-500">Transaction:</span> {transaction?.title ?? transactionId}</p>
             <p><span className="text-gray-500">Note:</span> {content}</p>
           </div>
-          <div className="flex gap-2">
-            <button
-              className="flex-1 rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700"
-              onClick={async () => {
-                await addNoteToTransaction({ transactionId, content });
-                handler?.("Note added successfully");
-              }}
-            >
-              Approve
-            </button>
-            <button
-              className="flex-1 rounded-md bg-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-300"
-              onClick={() => handler?.("Note addition denied by user")}
-            >
-              Deny
-            </button>
-          </div>
+          <ApprovalButtons
+            onApprove={async () => {
+              await addNoteToTransaction({ transactionId, content });
+              respond?.("Note added successfully");
+            }}
+            onDeny={() => respond?.("Note addition denied by user")}
+          />
         </div>
       );
     },
   });
 
-  // Showcase usage of generative UI. The only co pilot related that's not in actions, due to usage of TSX
-  useCopilotAction({
+  // Showcase usage of generative UI
+  useFrontendTool({
     name: "showTransactions",
     description:
       "Displays a list of transactions upon request. At least one parameter is required per request",
-    disabled: !PERMISSIONS.SHOW_TRANSACTIONS.includes(currentUser.role),
-    followUp: false,
+    available: PERMISSIONS.SHOW_TRANSACTIONS.includes(currentUser.role) ? "enabled" : "disabled",
     parameters: [
       {
         name: "card4Digits",
@@ -353,10 +369,11 @@ export default function Page() {
   });
 
   // Enable pin changing with co pilot
-  useCopilotAction({
+  useHumanInTheLoop({
+    followUp: false,
     name: "setCardPin",
-    description: "Set the pin code of an existing card",
-    disabled: !PERMISSIONS.SET_PIN.includes(currentUser.role),
+    description: "Set the pin code of an existing card. Ask the user for the new 4-digit PIN, then call this action immediately. Do NOT ask for additional confirmation - the approval UI will handle that.",
+    available: PERMISSIONS.SET_PIN.includes(currentUser.role) ? "enabled" : "disabled",
     parameters: [
       {
         name: "cardId",
@@ -364,9 +381,15 @@ export default function Page() {
         description: "The id of the card (provided by copilot)",
         required: true,
       },
+      {
+        name: "pin",
+        type: "string",
+        description: "The new 4-digit PIN code (provided by the user)",
+        required: true,
+      },
     ],
-    renderAndWait: ({ args, handler, status }) => {
-      const { cardId } = args;
+    render: ({ args, respond, status }) => {
+      const { cardId, pin } = args;
 
       if (status === "inProgress") {
         return <div>Loading...</div>;
@@ -379,40 +402,31 @@ export default function Page() {
           <h3 className="font-semibold text-lg">Change Card PIN</h3>
           <div className="text-sm space-y-1">
             <p><span className="text-gray-500">Card:</span> {card ? `${card.type} ending in ${card.last4}` : cardId}</p>
+            <p><span className="text-gray-500">New PIN:</span> {pin}</p>
           </div>
-          <div className="flex gap-2">
-            <button
-              className="flex-1 rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700"
-              onClick={() => {
-                dispatch({ dialogOpen: true, cardId });
-                handler?.("PIN change dialog opened");
-              }}
-            >
-              Approve
-            </button>
-            <button
-              className="flex-1 rounded-md bg-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-300"
-              onClick={() => handler?.("PIN change denied by user")}
-            >
-              Deny
-            </button>
-          </div>
+          <ApprovalButtons
+            onApprove={async () => {
+              await changePin({ pin, cardId });
+              respond?.("PIN changed successfully");
+            }}
+            onDeny={() => respond?.("PIN change denied by user")}
+          />
         </div>
       );
     },
   });
 
-  useCopilotAction({
+  useHumanInTheLoop({
+    followUp: false,
     name: "showAndApproveTransactions",
     description: `
       This operation is per department.
-      An executive department admin is allowed to approve/deny from other departments as well
-      
+      An executive department admin is allowed to approve/deny from other departments as well.
       Show the unapproved transactions and allow the admin per department to approve them.
-      
-      Transactions will be presented to the admin one by one
+      Transactions will be presented to the admin one by one.
+      Do NOT ask for confirmation - just call this action immediately. The approval UI will handle user confirmation.
     `,
-    disabled: !PERMISSIONS.APPROVE_TRANSACTION.includes(currentUser.role),
+    available: PERMISSIONS.APPROVE_TRANSACTION.includes(currentUser.role) ? "enabled" : "disabled",
     parameters: [
       {
         name: "transactionId",
@@ -422,14 +436,14 @@ export default function Page() {
         required: true,
       },
     ],
-    renderAndWait: ({ args, handler, status }) => {
+    render: ({ args, respond, status }) => {
       const { transactionId } = args;
       if (status === "inProgress") {
         return <div>Loading...</div>;
       }
 
       if (!transactionId) {
-        handler?.(
+        respond?.(
           "A transaction ID was not given, could be that there arent any pending approval or there was an error"
         );
         return <div>No pending transactions</div>;
@@ -443,7 +457,7 @@ export default function Page() {
         status: Transaction["status"];
       }) {
         await changeTransactionStatus({ id, status });
-        handler?.(`transaction ${id} ${status}`);
+        respond?.(`transaction ${id} ${status}`);
       }
 
       return (
@@ -481,13 +495,6 @@ export default function Page() {
         !PERMISSIONS[key as keyof typeof PERMISSIONS].includes(currentUser.role)
     ),
   });
-
-  // useCopilotReadable({
-  //   description: "The user has access to the following documents",
-  //   value: PERMISSIONS.READ_MSA.includes(currentUser.role) ? [FEDEX_MSA] : [],
-  // });
-
-  
 
   if (!cards || !policies) return null;
 
