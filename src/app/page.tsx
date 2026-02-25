@@ -215,7 +215,7 @@ export default function Page() {
   }, [hitlEnabled]);
 
   // Add new card — HITL mode (requires approval in chat)
-  useCopilotAction({
+  useFrontendTool({
     name: "addNewCardWithApproval",
     description: "Add new credit card (requires user approval)",
     disabled: !hitlEnabled || !PERMISSIONS.ADD_CARD.includes(currentUser.role),
