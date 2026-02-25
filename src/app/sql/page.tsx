@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button"
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { ChevronRight, ChevronLeft } from 'lucide-react'
 import { cn } from "@/lib/utils"
-import { useCopilotReadable, useFrontendTool } from "@copilotkit/react-core";
+import { useCopilotAction, useCopilotReadable } from "@copilotkit/react-core";
 import { CopilotChat } from "@copilotkit/react-ui";
 import { CodeSnippet } from "@/components/code-snippet";
 import {SqlTable} from "@/components/sql-table";
@@ -75,7 +75,7 @@ export default function Page() {
         value: databaseStructure
     });
 
-    useFrontendTool({
+    useCopilotAction({
         name: 'getSQLQueryForQuestion',
         description: '',
         parameters: [{
@@ -84,7 +84,7 @@ export default function Page() {
             description: 'The query for query result. MUST BE A VALID SQL QUERY. The full query (all lines) should be sent in one go',
             required: true,
         }],
-        handler: async () => {},
+        followUp: false,
         render: ({ args }) => {
             const { query } = args;
             const onExecute = async () => {

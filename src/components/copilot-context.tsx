@@ -1,5 +1,5 @@
 "use client";
-import { useCopilotReadable, useHumanInTheLoop } from "@copilotkit/react-core";
+import { useCopilotAction, useCopilotReadable } from "@copilotkit/react-core";
 import { useAuthContext } from "@/components/auth-context";
 import { Button } from "./ui/button";
 
@@ -50,14 +50,21 @@ const CopilotContext = ({ children }: { children: React.ReactNode }) => {
   // It is tired to the readable above, and requires that operations are implemented in their respective pages.
   // The LLM here will redirect the user to a different page, and set an `operation` query param to notify the page of the requested action
   // For example, you can find `change-pin` in the cards page, which is activated when `operation=change-pin` query param is sent
-  useHumanInTheLoop({
+  useCopilotAction({
     name: "navigateToPageAndPerform",
     description: `
-            Navigate to a different page to perform an operation.
-            IMPORTANT: Only use this action when the user needs to go to a DIFFERENT page than the one they are currently on.
-            Do NOT use this if the user is already on the correct page - instead, use the page-specific tools directly.
-            For example, if the user is on the cards page and asks to add a card, do NOT use this action - use the addNewCard tool instead.
-            Only use this when the user is on the wrong page entirely (e.g., on team page but asking about cards).
+            Navigate to a page to perform an operation. Use this if you are asked to perform an action outside of page context. For example:
+            The user is viewing a dashboard but asks to make changes to a team member or a credit card.
+            
+            If you are on the cards page for example, and are requested to perform a card related operation, you are allowed to perform it.
+            
+            If the operation is unavailable, tell the user to navigate themselves to the page.
+            Let them know which page that is.
+            Advise them to re-ask co-pilot once they arrive at the right page.
+            You can suggest making the navigation part yourself
+            Example: "Adding new card is not available in this page. Navigate to "Cards" page and try to ask me again there. Would you like me to take you there?"
+            
+            Otherwise, initiate the navigation without asking
         `,
     parameters: [
       {
@@ -82,7 +89,7 @@ const CopilotContext = ({ children }: { children: React.ReactNode }) => {
       },
     ],
     followUp: false,
-    render: ({ args, respond }) => {
+    renderAndWait: ({ args, handler }) => {
       const { page, operation, operationAvailable } = args;
 
       return (
@@ -96,7 +103,7 @@ const CopilotContext = ({ children }: { children: React.ReactNode }) => {
               window.location.href = `${page!.toLowerCase()}${
                 operationAvailable ? operationParams : ""
               }`;
-              respond?.(page!);
+              handler?.(page!);
             }}
             aria-label="Confirm Navigation"
             className="h-12 w-12 rounded-full bg-blue-50 text-blue-600 hover:bg-blue-100 hover:text-blue-700 dark:bg-blue-900/20 dark:text-blue-400 dark:hover:bg-blue-900/30 dark:hover:text-blue-300"
@@ -106,7 +113,7 @@ const CopilotContext = ({ children }: { children: React.ReactNode }) => {
           <Button
             variant="outline"
             size="icon"
-            onClick={() => respond?.("cancelled")}
+            onClick={() => handler?.("cancelled")}
             aria-label="Cancel Navigation"
             className="h-12 w-12 rounded-full bg-gray-50 text-gray-600 hover:bg-gray-100 hover:text-gray-700 dark:bg-gray-900/20 dark:text-gray-400 dark:hover:bg-gray-900/30 dark:hover:text-gray-300"
           >
