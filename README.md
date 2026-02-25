@@ -1,6 +1,4 @@
-# CopilotKit Banking App
-
-https://github.com/user-attachments/assets/90320a71-3e7a-4159-a3fa-4b844eb3c11d
+# CopilotKit Demo App
 
 This demo application highlights the capabilities of CopilotKit by demonstrating how to build an app that emphasizes authorization, supports multiple operations, and incorporates generative UI elements. The banking application scenario serves as a practical example of these features in action.
 
