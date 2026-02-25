@@ -4,6 +4,7 @@ import { useEffect, useReducer } from "react";
 import { useCopilotAction, useCopilotReadable } from "@copilotkit/react-core";
 import {
   CARD_COLORS,
+  CardBrand,
   NewCardRequest,
   Transaction,
 } from "@/app/api/v1/data";
@@ -93,10 +94,10 @@ export default function Page() {
     });
   };
 
-  // Enable add new card with co pilot
+  // Enable add new card with co pilot (human-in-the-loop)
   useCopilotAction({
     name: "addNewCard",
-    description: "Add new credit card",
+    description: "Add new credit card. Always show the card details for user approval before creating.",
     disabled: !PERMISSIONS.ADD_CARD.includes(currentUser.role),
     parameters: [
       {
@@ -119,8 +120,55 @@ export default function Page() {
         required: true,
       },
     ],
-    handler: async ({ type, color, pin }) => {
-      await addNewCard({ type, color, pin } as NewCardRequest);
+    renderAndWait: ({ args, handler, status }) => {
+      const { type, color, pin } = args;
+
+      if (status === "inProgress") {
+        return <div>Loading...</div>;
+      }
+
+      return (
+        <div className="rounded-lg border bg-white p-4 shadow-sm space-y-4">
+          <h3 className="font-semibold text-lg">New Card Request</h3>
+          <div className="flex items-center gap-3">
+            <div className="bg-white border rounded-md p-1 flex items-center justify-center w-10 h-7">
+              {type === CardBrand.Visa ? (
+                <svg className="h-5" viewBox="0 0 780 500" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M293.2 348.7l33.4-195.8h53.4l-33.4 195.8zM540.7 157.2c-10.6-4-27.2-8.3-47.9-8.3-52.8 0-90 26.6-90.2 64.6-.3 28.1 26.5 43.8 46.8 53.2 20.8 9.6 27.8 15.7 27.7 24.3-.1 13.1-16.6 19.1-32 19.1-21.4 0-32.7-3-50.3-10.2l-6.9-3.1-7.5 43.8c12.5 5.5 35.6 10.2 59.6 10.5 56.2 0 92.6-26.3 93-66.8.2-22.3-14-39.2-44.8-53.2-18.6-9.1-30.1-15.1-30-24.3 0-8.1 9.7-16.8 30.6-16.8 17.4-.3 30.1 3.5 39.9 7.5l4.8 2.3 7.2-42.7zM676.3 152.9h-41.3c-12.8 0-22.4 3.5-28 16.3l-79.4 179.5h56.2s9.2-24.2 11.3-29.5c6.1 0 60.8.1 68.6.1 1.6 6.9 6.5 29.4 6.5 29.4h49.7l-43.6-195.8zm-65.8 126.3c4.4-11.3 21.4-54.8 21.4-54.8-.3.5 4.4-11.4 7.1-18.8l3.6 17s10.3 47 12.4 56.6h-44.5zM232.2 152.9L180 283.6l-5.6-27c-9.7-31.2-39.9-65-73.7-81.9l47.9 173.8h56.6l84.2-195.6h-57.2" fill="#1a1f71"/>
+                  <path d="M131.9 152.9H46.3l-.7 3.8c67.1 16.2 111.5 55.4 129.9 102.5L157.2 169c-3.2-12.5-12.7-15.7-25.3-16.1" fill="#f7a600"/>
+                </svg>
+              ) : (
+                <svg className="h-5" viewBox="0 0 780 500" xmlns="http://www.w3.org/2000/svg">
+                  <circle cx="312" cy="250" r="200" fill="#eb001b"/>
+                  <circle cx="468" cy="250" r="200" fill="#f79e1b"/>
+                  <path d="M390 100.2c-49.7 38.3-81.6 98.1-81.6 165.8s31.9 127.5 81.6 165.8c49.7-38.3 81.6-98.1 81.6-165.8S439.7 138.5 390 100.2z" fill="#ff5f00"/>
+                </svg>
+              )}
+            </div>
+            <div>
+              <p className="font-medium">{type}</p>
+              <p className="text-sm text-gray-500">PIN: {pin}</p>
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <button
+              className="flex-1 rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700"
+              onClick={async () => {
+                await addNewCard({ type, color, pin } as NewCardRequest);
+                handler?.("Card created successfully");
+              }}
+            >
+              Approve
+            </button>
+            <button
+              className="flex-1 rounded-md bg-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-300"
+              onClick={() => handler?.("Card creation denied by user")}
+            >
+              Deny
+            </button>
+          </div>
+        </div>
+      );
     },
   });
 
@@ -142,13 +190,47 @@ export default function Page() {
         required: true,
       },
     ],
-    handler: async ({ cardId, policyType }) => {
-      const policyId = policies.find(
-        (policy) => policy.type === policyType
-      )?.id;
-      if (!policyId)
-        throw new Error("Could not find matching policy to assign");
-      await assignPolicyToCard({ cardId, policyId });
+    renderAndWait: ({ args, handler, status }) => {
+      const { cardId, policyType } = args;
+
+      if (status === "inProgress") {
+        return <div>Loading...</div>;
+      }
+
+      const card = cards.find((c) => c.id === cardId);
+      const policy = policies.find((p) => p.type === policyType);
+
+      return (
+        <div className="rounded-lg border bg-white p-4 shadow-sm space-y-4">
+          <h3 className="font-semibold text-lg">Assign Policy to Card</h3>
+          <div className="text-sm space-y-1">
+            <p><span className="text-gray-500">Card:</span> {card ? `${card.type} ending in ${card.last4}` : cardId}</p>
+            <p><span className="text-gray-500">Policy:</span> {policyType}</p>
+          </div>
+          <div className="flex gap-2">
+            <button
+              className="flex-1 rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700"
+              onClick={async () => {
+                const policyId = policy?.id;
+                if (!policyId) {
+                  handler?.("Could not find matching policy to assign");
+                  return;
+                }
+                await assignPolicyToCard({ cardId, policyId });
+                handler?.("Policy assigned successfully");
+              }}
+            >
+              Approve
+            </button>
+            <button
+              className="flex-1 rounded-md bg-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-300"
+              onClick={() => handler?.("Policy assignment denied by user")}
+            >
+              Deny
+            </button>
+          </div>
+        </div>
+      );
     },
   });
 
@@ -170,7 +252,42 @@ export default function Page() {
         required: true,
       },
     ],
-    handler: addNoteToTransaction,
+    renderAndWait: ({ args, handler, status }) => {
+      const { transactionId, content } = args;
+
+      if (status === "inProgress") {
+        return <div>Loading...</div>;
+      }
+
+      const transaction = transactions.find((t) => t.id === transactionId);
+
+      return (
+        <div className="rounded-lg border bg-white p-4 shadow-sm space-y-4">
+          <h3 className="font-semibold text-lg">Add Note to Transaction</h3>
+          <div className="text-sm space-y-1">
+            <p><span className="text-gray-500">Transaction:</span> {transaction?.title ?? transactionId}</p>
+            <p><span className="text-gray-500">Note:</span> {content}</p>
+          </div>
+          <div className="flex gap-2">
+            <button
+              className="flex-1 rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700"
+              onClick={async () => {
+                await addNoteToTransaction({ transactionId, content });
+                handler?.("Note added successfully");
+              }}
+            >
+              Approve
+            </button>
+            <button
+              className="flex-1 rounded-md bg-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-300"
+              onClick={() => handler?.("Note addition denied by user")}
+            >
+              Deny
+            </button>
+          </div>
+        </div>
+      );
+    },
   });
 
   // Showcase usage of generative UI. The only co pilot related that's not in actions, due to usage of TSX
@@ -248,8 +365,40 @@ export default function Page() {
         required: true,
       },
     ],
-    handler: async ({ cardId }) => {
-      dispatch({ dialogOpen: true, cardId });
+    renderAndWait: ({ args, handler, status }) => {
+      const { cardId } = args;
+
+      if (status === "inProgress") {
+        return <div>Loading...</div>;
+      }
+
+      const card = cards.find((c) => c.id === cardId);
+
+      return (
+        <div className="rounded-lg border bg-white p-4 shadow-sm space-y-4">
+          <h3 className="font-semibold text-lg">Change Card PIN</h3>
+          <div className="text-sm space-y-1">
+            <p><span className="text-gray-500">Card:</span> {card ? `${card.type} ending in ${card.last4}` : cardId}</p>
+          </div>
+          <div className="flex gap-2">
+            <button
+              className="flex-1 rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700"
+              onClick={() => {
+                dispatch({ dialogOpen: true, cardId });
+                handler?.("PIN change dialog opened");
+              }}
+            >
+              Approve
+            </button>
+            <button
+              className="flex-1 rounded-md bg-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-300"
+              onClick={() => handler?.("PIN change denied by user")}
+            >
+              Deny
+            </button>
+          </div>
+        </div>
+      );
     },
   });
 
