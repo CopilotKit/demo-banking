@@ -20,7 +20,7 @@ import {
 import { Member, MemberRole } from "@/app/api/v1/data";
 import { useAuthContext } from "@/components/auth-context";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
-import { useCopilotReadable } from "@copilotkit/react-core";
+import { useCopilotChat, useCopilotReadable } from "@copilotkit/react-core";
 import { usePathname } from "next/navigation";
 import { useCopilotChatSuggestions } from "@copilotkit/react-ui";
 
@@ -114,6 +114,8 @@ export function LayoutComponent({ children }: LayoutProps) {
     minSuggestions: 3,
     maxSuggestions: 3,
   });
+
+  const { setMessages, reloadMessages } = useCopilotChat();
 
   return (
     <div className="flex h-screen overflow-hidden">

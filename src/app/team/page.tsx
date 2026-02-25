@@ -107,10 +107,6 @@ export default function Team() {
           </div>
           <ApprovalButtons
             onApprove={async () => {
-              if (!id) {
-                respond?.("Missing member information");
-                return;
-              }
               await removeMember(id);
               respond?.("Member removed successfully");
             }}
@@ -153,10 +149,6 @@ export default function Team() {
           </div>
           <ApprovalButtons
             onApprove={async () => {
-              if (!id || !role) {
-                respond?.("Missing member or role information");
-                return;
-              }
               await changeMemberRole(id, role as MemberRole);
               respond?.("Role changed successfully");
             }}
@@ -199,10 +191,6 @@ export default function Team() {
           </div>
           <ApprovalButtons
             onApprove={async () => {
-              if (!id || !newTeam) {
-                respond?.("Missing member or team information");
-                return;
-              }
               await changeMemberTeam(id, newTeam as ExpenseRole);
               respond?.("Team changed successfully");
             }}
