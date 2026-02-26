@@ -22,7 +22,6 @@ import { useAuthContext } from "@/components/auth-context";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { useCopilotReadable } from "@copilotkit/react-core";
 import { usePathname } from "next/navigation";
-import { useCopilotChatSuggestions } from "@copilotkit/react-ui";
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -102,17 +101,6 @@ export function LayoutComponent({ children }: LayoutProps) {
   useCopilotReadable({
     description: "The current page where the user is",
     value: pathname.split("/")[1] == "" ? "cards" : pathname.split("/")[1],
-  });
-  useCopilotChatSuggestions({
-    instructions: `
-      Suggest exactly 3 actions based on the current page context.
-      On the cards page: suggest one card action, one transaction action, and one policy action.
-      On the dashboard page: suggest one summary action, one transaction action, and one navigation action.
-      Keep suggestions short and actionable.
-    `,
-    available: "always",
-    minSuggestions: 3,
-    maxSuggestions: 3,
   });
 
   return (
