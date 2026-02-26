@@ -105,14 +105,14 @@ export function LayoutComponent({ children }: LayoutProps) {
   });
   useCopilotChatSuggestions({
     instructions: `
-      Suggest exactly 3 actions based on the current page context.
-      On the cards page: suggest one card action, one transaction action, and one policy action.
-      On the dashboard page: suggest one summary action, one transaction action, and one navigation action.
+      Suggest exactly 2 actions based on the current page context.
+      On the cards page: suggest one transaction action.
+      On the dashboard page: suggest one card action.
       Keep suggestions short and actionable.
     `,
     available: "always",
-    minSuggestions: 3,
-    maxSuggestions: 3,
+    minSuggestions: 2,
+    maxSuggestions: 2,
   });
 
   return (
